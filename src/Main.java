@@ -1,37 +1,61 @@
+import java.io.*;
 import java.util.*;
 
 public class Main {
-    public static void main(String[] args) {
-        // Definirea gramaticii
-        Grammar grammar = new Grammar("E");
-        grammar.addProduction("E", "E + T");
-        grammar.addProduction("E", "T");
-        grammar.addProduction("T", "T * F");
-        grammar.addProduction("T", "F");
-        grammar.addProduction("F", "( E )");
-        grammar.addProduction("F", "id");
+    public static void main(String[] args) throws IOException {
+        // Read the grammar from the file
+        Grammar grammar = readGrammarFromFile("src/gramatica.txt");
 
-        // Generarea stărilor și tranzițiilor
+        // Print out the grammar to verify it's loaded correctly
+        System.out.println("Gramatică citită din fișier:");
+        System.out.println("Simbol de start: " + grammar.startSymbol);
+        System.out.println("Producții:");
+        for (Production p : grammar.productions) {
+            System.out.println(p);
+        }
+
+        // Generating states and transitions
         Map<State, Map<String, State>> transitions = new HashMap<>();
         List<State> states = generateStates(grammar, transitions);
 
-        System.out.println("Stări:");
-        for (int i = 0; i < states.size(); i++) {
-            System.out.println("Stare " + i + ": " + states.get(i).items);
-        }
+        // Extract terminals and nonTerminals for table headers
+        List<String> terminals = new ArrayList<>(grammar.terminals);
+        terminals.add("$"); // Add end-of-input symbol
+        List<String> nonTerminals = new ArrayList<>(grammar.nonTerminals);
 
-        // Generarea tabelelor TA și TS
+        // Generating action and goto tables
         Map<State, Map<String, String>> actionTable = generateActionTable(states, grammar, transitions);
         Map<State, Map<String, Integer>> gotoTable = generateGotoTable(states, grammar, transitions);
 
-        System.out.println("\nTabela de Acțiuni:");
-        printTable(actionTable);
-
-        System.out.println("\nTabela de Salt:");
-        printTable(gotoTable);
+        // Print action and goto tables
+        printActionTable(states, actionTable, terminals);
+        printGotoTable(states, gotoTable, nonTerminals);
     }
 
-    private static List<State> generateStates(Grammar grammar, Map<State, Map<String, State>> transitions) {
+    // Method to read the grammar from the file
+    private static Grammar readGrammarFromFile(String filename) throws IOException {
+        Grammar grammar = new Grammar("E"); // Assuming "E" is the start symbol
+        BufferedReader reader = new BufferedReader(new FileReader(filename));
+        String line;
+
+        while ((line = reader.readLine()) != null) {
+            line = line.trim();
+            if (!line.isEmpty()) {
+                // Split the production into left and right parts
+                String[] parts = line.split("->");
+                String left = parts[0].trim();
+                String right = parts[1].trim();
+
+                // Add the production to the grammar
+                grammar.addProduction(left, right);
+            }
+        }
+
+        reader.close();
+        return grammar;
+    }
+
+private static List<State> generateStates(Grammar grammar, Map<State, Map<String, State>> transitions) {
         // Generează stările și tranzițiile pentru gramatica dată
         //Construiește toate stările prin aplicarea funcțiilor de închidere și tranziție.
         //Utilizează o coadă pentru a genera stările în mod iterativ.
@@ -135,9 +159,51 @@ public class Main {
         return gotoTable;
     }
 
-    private static void printTable(Map<?, ? extends Map<String, ?>> table) {
-        for (var entry : table.entrySet()) {
-            System.out.println(entry.getKey() + ": " + entry.getValue());
+    private static void printActionTable(List<State> states, Map<State, Map<String, String>> actionTable, List<String> terminals) {
+        System.out.println("\nTabela de Acțiuni (TA):");
+
+        // Print header
+        System.out.print("Stare\t");
+        for (String terminal : terminals) {
+            System.out.print(terminal + "\t");
+        }
+        System.out.println();
+
+        // Print rows
+        for (int i = 0; i < states.size(); i++) {
+            State state = states.get(i);
+            System.out.print(i + "\t"); // State number
+            for (String terminal : terminals) {
+                String action = actionTable.getOrDefault(state, new HashMap<>()).getOrDefault(terminal, "-");
+                System.out.print(action + "\t");
+            }
+            System.out.println();
         }
     }
+
+    private static void printGotoTable(List<State> states, Map<State, Map<String, Integer>> gotoTable, List<String> nonTerminals) {
+        System.out.println("\nTabela de Salt (TS):");
+
+        // Print header
+        System.out.print("Stare\t");
+        for (String nonTerminal : nonTerminals) {
+            System.out.print(nonTerminal + "\t");
+        }
+        System.out.println();
+
+        // Print rows
+        for (int i = 0; i < states.size(); i++) {
+            State state = states.get(i);
+            System.out.print(i + "\t"); // State number
+            for (String nonTerminal : nonTerminals) {
+                Integer nextState = gotoTable.getOrDefault(state, new HashMap<>()).get(nonTerminal);
+                System.out.print((nextState != null ? nextState : "-") + "\t");
+            }
+            System.out.println();
+        }
+    }
+
+
+
 }
+
