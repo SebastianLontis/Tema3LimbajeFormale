@@ -1,6 +1,6 @@
 import java.util.*;
 
-public class Grammar { //stocheaza struct gramaticii
+public class Grammar {// Utilizăm Grammar pentru a crea articole LR(1) și a le combina în stări (State)
     List<Production> productions = new ArrayList<>();
     Set<String> terminals = new HashSet<>();
     Set<String> nonTerminals = new HashSet<>();
@@ -16,6 +16,7 @@ public class Grammar { //stocheaza struct gramaticii
         nonTerminals.add(left);
         for (String symbol : symbols) {
             if (!symbol.matches("[A-Z]")) terminals.add(symbol);
+            else nonTerminals.add(symbol);
         }
     }
 
@@ -27,4 +28,3 @@ public class Grammar { //stocheaza struct gramaticii
                 "\nStart Symbol: " + startSymbol;
     }
 }
-//Adaugă producțiile gramaticii și identifică terminalele și neterminalele.

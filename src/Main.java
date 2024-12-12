@@ -2,11 +2,10 @@ import java.io.*;
 import java.util.*;
 
 public class Main {
+
     public static void main(String[] args) throws IOException {
-        // Read the grammar from the file
         Grammar grammar = readGrammarFromFile("src/gramatica.txt");
 
-        // Print out the grammar to verify it's loaded correctly
         System.out.println("Gramatică citită din fișier:");
         System.out.println("Simbol de start: " + grammar.startSymbol);
         System.out.println("Producții:");
@@ -14,39 +13,33 @@ public class Main {
             System.out.println(p);
         }
 
-        // Generating states and transitions
+        // Creează harta tranzițiilor și generează toate stările LR(1).
         Map<State, Map<String, State>> transitions = new HashMap<>();
-        List<State> states = generateStates(grammar, transitions);
+        List<State> states = generateStates(grammar, transitions); // Generate all LR(1) states.
 
-        // Extract terminals and nonTerminals for table headers
+        // Construiește liste separate pentru terminale și neterminale.
         List<String> terminals = new ArrayList<>(grammar.terminals);
-        terminals.add("$"); // Add end-of-input symbol
+        terminals.add("$");
         List<String> nonTerminals = new ArrayList<>(grammar.nonTerminals);
 
-        // Generating action and goto tables
         Map<State, Map<String, String>> actionTable = generateActionTable(states, grammar, transitions);
         Map<State, Map<String, Integer>> gotoTable = generateGotoTable(states, grammar, transitions);
 
-        // Print action and goto tables
         printActionTable(states, actionTable, terminals);
         printGotoTable(states, gotoTable, nonTerminals);
     }
 
-    // Method to read the grammar from the file
     private static Grammar readGrammarFromFile(String filename) throws IOException {
-        Grammar grammar = new Grammar("E"); // Assuming "E" is the start symbol
+        Grammar grammar = new Grammar("S"); // Start symbol is "S" as provided.
         BufferedReader reader = new BufferedReader(new FileReader(filename));
         String line;
 
         while ((line = reader.readLine()) != null) {
-            line = line.trim();
+            line = line.trim(); // Elimină spațiile goale.
             if (!line.isEmpty()) {
-                // Split the production into left and right parts
                 String[] parts = line.split("->");
                 String left = parts[0].trim();
                 String right = parts[1].trim();
-
-                // Add the production to the grammar
                 grammar.addProduction(left, right);
             }
         }
@@ -55,22 +48,23 @@ public class Main {
         return grammar;
     }
 
-private static List<State> generateStates(Grammar grammar, Map<State, Map<String, State>> transitions) {
-        // Generează stările și tranzițiile pentru gramatica dată
-        //Construiește toate stările prin aplicarea funcțiilor de închidere și tranziție.
-        //Utilizează o coadă pentru a genera stările în mod iterativ.
+    private static List<State> generateStates(Grammar grammar, Map<State, Map<String, State>> transitions) {
+        // Listează toate stările și inițializează starea de început.
         List<State> states = new ArrayList<>();
         State startState = closure(Set.of(new LR1Item(grammar.startSymbol, List.of("E"), 0, "$")), grammar);
         states.add(startState);
 
+        // Folosește o coadă pentru a procesa fiecare stare.
         Queue<State> queue = new LinkedList<>();
         queue.add(startState);
 
+        // Parcurge toate stările posibile pentru a genera tranzițiile.c
         while (!queue.isEmpty()) {
             State currentState = queue.poll();
             Map<String, State> currentTransitions = new HashMap<>();
             transitions.put(currentState, currentTransitions);
 
+            // Identifică simbolurile care pot fi procesate în această stare.
             Set<String> symbols = new HashSet<>();
             for (LR1Item item : currentState.items) {
                 if (item.dotPosition < item.right.size()) {
@@ -78,6 +72,7 @@ private static List<State> generateStates(Grammar grammar, Map<State, Map<String
                 }
             }
 
+            // Pentru fiecare simbol, generează starea următoare.
             for (String symbol : symbols) {
                 Set<LR1Item> nextItems = new HashSet<>();
                 for (LR1Item item : currentState.items) {
@@ -86,6 +81,7 @@ private static List<State> generateStates(Grammar grammar, Map<State, Map<String
                     }
                 }
 
+                // Calculează închiderea pentru starea nouă și adaug-o dacă nu există deja.
                 State nextState = closure(nextItems, grammar);
                 if (!states.contains(nextState)) {
                     states.add(nextState);
@@ -98,7 +94,7 @@ private static List<State> generateStates(Grammar grammar, Map<State, Map<String
     }
 
     private static State closure(Set<LR1Item> items, Grammar grammar) {
-        // Închide o colecție de articole LR(1) folosind regulile de producție din gramatică
+        // Calculează închiderea unui set de itemi LR(1).
         Set<LR1Item> closure = new HashSet<>(items);
         boolean changed;
 
@@ -106,6 +102,7 @@ private static List<State> generateStates(Grammar grammar, Map<State, Map<String
             changed = false;
             Set<LR1Item> newItems = new HashSet<>();
 
+            // Pentru fiecare item, adaugă noile itemi corespunzători neterminalelor.
             for (LR1Item item : closure) {
                 if (item.dotPosition < item.right.size()) {
                     String symbol = item.right.get(item.dotPosition);
@@ -119,6 +116,7 @@ private static List<State> generateStates(Grammar grammar, Map<State, Map<String
                 }
             }
 
+            // Adaugă noile itemi în închidere dacă sunt noi.
             if (closure.addAll(newItems)) changed = true;
         } while (changed);
 
@@ -127,22 +125,42 @@ private static List<State> generateStates(Grammar grammar, Map<State, Map<String
 
     private static Map<State, Map<String, String>> generateActionTable(List<State> states, Grammar grammar, Map<State, Map<String, State>> transitions) {
         Map<State, Map<String, String>> actionTable = new HashMap<>();
+
         for (State state : states) {
             Map<String, String> actions = new HashMap<>();
             actionTable.put(state, actions);
 
             for (LR1Item item : state.items) {
                 if (item.dotPosition == item.right.size()) {
-                    if (item.left.equals(grammar.startSymbol)) {
-                        actions.put("$", "acc");
+                    // If the item is complete (dot is at the end), mark reduction.
+                    if (item.left.equals(grammar.startSymbol) && item.lookahead.equals("$")) {
+                        actions.put("$", "acc"); // Accept action.
                     } else {
-                        actions.put(item.lookahead, "r" + grammar.productions.indexOf(new Production(item.left, item.right)));
+                        // Find the production index for the reduction.
+                        for (int i = 0; i < grammar.productions.size(); i++) {
+                            Production production = grammar.productions.get(i);
+                            if (production.left.equals(item.left) && production.right.equals(item.right)) {
+                                actions.put(item.lookahead, "r" + i); // Reducere.
+                                break;
+                            }
+                        }
+                    }
+                } else {
+                    // If the item is not complete, mark shift.
+                    String symbol = item.right.get(item.dotPosition);
+                    if (grammar.terminals.contains(symbol)) {
+                        State nextState = transitions.get(state).get(symbol);
+                        if (nextState != null) {
+                            actions.put(symbol, "s" + states.indexOf(nextState)); // Shift
+                        }
                     }
                 }
             }
         }
+
         return actionTable;
     }
+
 
     private static Map<State, Map<String, Integer>> generateGotoTable(List<State> states, Grammar grammar, Map<State, Map<String, State>> transitions) {
         Map<State, Map<String, Integer>> gotoTable = new HashMap<>();
@@ -150,9 +168,10 @@ private static List<State> generateStates(Grammar grammar, Map<State, Map<String
             Map<String, Integer> gotos = new HashMap<>();
             gotoTable.put(state, gotos);
 
-            for (String symbol : grammar.nonTerminals) {
-                if (transitions.get(state).containsKey(symbol)) {
-                    gotos.put(symbol, states.indexOf(transitions.get(state).get(symbol)));
+            for (String nonTerminal : grammar.nonTerminals) {
+                State nextState = transitions.get(state).get(nonTerminal);
+                if (nextState != null) {
+                    gotos.put(nonTerminal, states.indexOf(nextState)); // Adaugă următoarea stare în tabelul de salt.
                 }
             }
         }
@@ -162,20 +181,18 @@ private static List<State> generateStates(Grammar grammar, Map<State, Map<String
     private static void printActionTable(List<State> states, Map<State, Map<String, String>> actionTable, List<String> terminals) {
         System.out.println("\nTabela de Acțiuni (TA):");
 
-        // Print header
-        System.out.print("Stare\t");
+        System.out.printf("%-10s", "Stare");
         for (String terminal : terminals) {
-            System.out.print(terminal + "\t");
+            System.out.printf("%-10s", terminal);
         }
         System.out.println();
 
-        // Print rows
         for (int i = 0; i < states.size(); i++) {
             State state = states.get(i);
-            System.out.print(i + "\t"); // State number
+            System.out.printf("%-10d", i);
             for (String terminal : terminals) {
                 String action = actionTable.getOrDefault(state, new HashMap<>()).getOrDefault(terminal, "-");
-                System.out.print(action + "\t");
+                System.out.printf("%-10s", action);
             }
             System.out.println();
         }
@@ -184,26 +201,20 @@ private static List<State> generateStates(Grammar grammar, Map<State, Map<String
     private static void printGotoTable(List<State> states, Map<State, Map<String, Integer>> gotoTable, List<String> nonTerminals) {
         System.out.println("\nTabela de Salt (TS):");
 
-        // Print header
-        System.out.print("Stare\t");
+        System.out.printf("%-10s", "Stare");
         for (String nonTerminal : nonTerminals) {
-            System.out.print(nonTerminal + "\t");
+            System.out.printf("%-10s", nonTerminal);
         }
         System.out.println();
 
-        // Print rows
         for (int i = 0; i < states.size(); i++) {
             State state = states.get(i);
-            System.out.print(i + "\t"); // State number
+            System.out.printf("%-10d", i);
             for (String nonTerminal : nonTerminals) {
-                Integer nextState = gotoTable.getOrDefault(state, new HashMap<>()).get(nonTerminal);
-                System.out.print((nextState != null ? nextState : "-") + "\t");
+                Integer nextState = gotoTable.getOrDefault(state, new HashMap<>()).getOrDefault(nonTerminal, -1);
+                System.out.printf("%-10s", (nextState != -1 ? nextState : "-"));
             }
             System.out.println();
         }
     }
-
-
-
 }
-

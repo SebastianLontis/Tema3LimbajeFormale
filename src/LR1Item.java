@@ -1,7 +1,7 @@
 import java.util.List;
 import java.util.Objects;
 
-public class LR1Item {
+public class LR1Item { //Item reprezintă o regulă gramaticală și poziția curentă în procesarea ei.
     String left; // Partea stângă
     List<String> right; // Partea dreaptă
     int dotPosition; // Poziția punctului
